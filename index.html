@@ -1,4 +1,4 @@
-f<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
@@ -1156,18 +1156,7 @@ console.log("Firebase Connected Successfully");
 
 <script>
 //AUTH DATA
-const USERS = {
-  'TXM_ADMIN':     {pw:'IITISM@Admin_TXM', role:'admin'},
-  'TXM_NITNAG_01': {pw:'Nag@land27Xr',   role:'coe', id:'nitnag'},
-  'TXM_NITMIZ_02': {pw:'Mizo#Rum48p',    role:'coe', id:'nitmiz'},
-  'TXM_NITAGT_03': {pw:'Agart@la59Qx',   role:'coe', id:'nitagt'},
-  'TXM_IIITMAN_04':{pw:'Mani#Core62Zp',  role:'coe', id:'iiitman'},
-  'TXM_VNITNAG_05':{pw:'Nagpur@Lab73X',  role:'coe', id:'vnitnag'},
-  'TXM_IIEST_06':  {pw:'Shib#Tech81Lp',  role:'coe', id:'iiest'},
-  'TXM_NITRKL_07': {pw:'Rkl@Mine94Qx',   role:'coe', id:'nitrkl'},
-  'TXM_BITSIN_08': {pw:'Sindri#Forge56Z', role:'coe', id:'bitsin'},
-  'TXM_MAHUNI_09': {pw:'Mahen@Lab67Xp',  role:'coe', id:'mahuni'},
-};
+
 
 const COE_LIST = [
   {id:'nitnag',  name:'TEXMiN-NIT Nagaland Mining CoE',        tier:'A', tdMax:1, fwMax:5,  piMax:3, budget:3000000},
@@ -1238,36 +1227,76 @@ function togglePw(){
 }
 
 //LOGIN / LOGOUT
-function doLogin(){
-  const id = document.getElementById('inp-id').value.trim();
-  const pw = document.getElementById('inp-pw').value;
-  const err = document.getElementById('login-err');
-  const u = USERS[id];
-  if(!u || u.pw!==pw){
-    err.style.display='block';
-    document.getElementById('inp-id').value='';
-    document.getElementById('inp-pw').value='';
-    document.getElementById('inp-id').focus();
-    return;
-  }
-  err.style.display='none';
-  currentUser = id;
-  document.getElementById('login-screen').style.display='none';
-  document.getElementById('app').style.display='block';
-  const badge = document.getElementById('tb-badge');
-  if(u.role==='admin'){
-    document.getElementById('tb-title').textContent='TEXMiN Foundation – CoE Dashboard';
 
-    badge.className='tb-badge badge-admin'; badge.textContent='ADMIN';
-    document.getElementById('tb-user').textContent=id;
-    renderAdmin();
-  } else {
-    const coe = COE_LIST.find(c=>c.id===u.id);
-    currentCoeid = u.id;
-    document.getElementById('tb-title').textContent = coe.name;
-    badge.className='tb-badge badge-coe'; badge.textContent='CoE · Tier '+coe.tier;
-    document.getElementById('tb-user').textContent = id;
-    renderCoE(u.id);
+async function doLogin(){
+
+  const email = document.getElementById('inp-id').value.trim();
+  const password = document.getElementById('inp-pw').value;
+  const err = document.getElementById('login-err');
+
+  try{
+
+    const userCredential = await firebase.auth()
+      .signInWithEmailAndPassword(email, password);
+
+    const user = userCredential.user;
+
+    const doc = await firebase.firestore()
+      .collection("users")
+      .doc(user.email)
+      .get();
+
+    if(!doc.exists){
+      err.style.display='block';
+      err.textContent='User data not found';
+      return;
+    }
+
+    const data = doc.data();
+
+    currentUser = user.email;
+
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='block';
+
+    const badge = document.getElementById('tb-badge');
+
+    if(data.role === 'admin'){
+
+      document.getElementById('tb-title').textContent =
+        'TEXMiN Foundation ⛏ CoE Dashboard';
+
+      badge.className='tb-badge badge-admin';
+      badge.textContent='ADMIN';
+
+      document.getElementById('tb-user').textContent =
+        data.name || user.email;
+
+      renderAdmin();
+
+    } else {
+
+      const coe = COE_LIST.find(c=>c.id===data.coeId);
+
+      currentCoeId = data.coeId;
+
+      document.getElementById('tb-title').textContent = coe.name;
+
+      badge.className='tb-badge badge-coe';
+      badge.textContent='CoE • Tier '+coe.tier;
+
+      document.getElementById('tb-user').textContent =
+        data.name || user.email;
+
+      renderCOE(data.coeId);
+    }
+
+  } catch(e){
+
+    err.style.display='block';
+    err.textContent='Invalid email or password';
+
+    console.error(e);
   }
 }
 
