@@ -1234,6 +1234,8 @@ async function doLogin(){
   const password = document.getElementById('inp-pw').value;
   const err = document.getElementById('login-err');
 
+  err.style.display = 'none';
+
   try{
 
     const userCredential = await firebase.auth()
@@ -1247,6 +1249,7 @@ async function doLogin(){
       .get();
 
     if(!doc.exists){
+
       err.style.display='block';
       err.textContent='User data not found';
       return;
@@ -1293,10 +1296,10 @@ async function doLogin(){
 
   } catch(e){
 
-    err.style.display='block';
-    err.textContent='Invalid email or password';
-
     console.error(e);
+
+    err.style.display='block';
+    err.textContent = e.message;
   }
 }
 
