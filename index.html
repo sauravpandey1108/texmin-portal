@@ -1163,10 +1163,10 @@ const COE_LIST = [
   {id:'nitmiz',  name:'TEXMiN-NIT Mizoram Mining CoE',         tier:'A', tdMax:1, fwMax:5,  piMax:3, budget:3000000},
   {id:'nitagt',  name:'TEXMiN-NIT Agartala Mining CoE',        tier:'A', tdMax:1, fwMax:5,  piMax:3, budget:3000000},
   {id:'iiitman', name:'TEXMiN-IIIT Manipur Mining CoE',        tier:'A', tdMax:1, fwMax:5,  piMax:3, budget:3000000},
-  {id:'vnitnag', name:'TEXMiN-VNIT Nagpur Mining CoE',         tier:'B', tdMax:2, fwMax:10, piMax:5, budget:6400000},
-  {id:'iiest',   name:'TEXMiN-IIEST Shibpur Mining CoE',       tier:'B', tdMax:2, fwMax:10, piMax:5, budget:6400000},
-  {id:'nitrkl',  name:'TEXMiN-NITRkl-FTBI Mining CoE',        tier:'B', tdMax:2, fwMax:10, piMax:5, budget:6400000},
-  {id:'bitsin',  name:'TEXMiN-BIT Sindri Mining CoE',          tier:'B', tdMax:2, fwMax:10, piMax:5, budget:6400000},
+  {id:'vnitnag', name:'TEXMiN-VNIT Nagpur Mining CoE',         tier:'B', tdMax:2, fwMax:10, piMax:5, budget:5800000, cicFund:600000},
+  {id:'iiest',   name:'TEXMiN-IIEST Shibpur Mining CoE',       tier:'B', tdMax:2, fwMax:10, piMax:5, budget:5800000, cicFund:600000},
+  {id:'nitrkl',  name:'TEXMiN-NITRkl-FTBI Mining CoE',        tier:'B', tdMax:2, fwMax:10, piMax:5, budget:5800000, cicFund:600000},
+  {id:'bitsin',  name:'TEXMiN-BIT Sindri Mining CoE',          tier:'B', tdMax:2, fwMax:10, piMax:5, budget:5800000, cicFund:600000},
   {id:'mahuni',  name:'TEXMiN-Mahendra University Mining CoE', tier:'C', tdMax:2, fwMax:5,  piMax:3, budget:6600000},
 ];
 
@@ -1178,7 +1178,7 @@ const TRL_LEVELS = ['TRL 1 – Basic principles','TRL 2 – Technology concept',
 
 let DB = {};
 let currentUser = null;
-let currentCoeid = null;
+let currentCoeId = null;
 
 //STORAGE (localStorage)
 function loadAll(){
@@ -1192,7 +1192,7 @@ function saveAll(){
 }
 
 function getDB(id){
-  if(!DB[id]) DB[id]={preInc:[],techDev:[],fellows:[],updates:[]};
+  if(!DB[id]) DB[id]={preInc:[],techDev:[],fellows:[],updates:[],unreadAnnouncements:0,};
   return DB[id];
 }
 
@@ -1231,7 +1231,7 @@ function togglePw(){
 async function doLogin(){
 
   const email = document.getElementById('inp-id').value.trim();
-  const password = document.getElementById('inp-pw').value;
+  const password = document.getElementById('inp-pw').value.trim();
   const err = document.getElementById('login-err');
 
   err.style.display = 'none';
@@ -1305,7 +1305,7 @@ async function doLogin(){
 
 function doLogout(){
   currentUser=null; 
-  currentCoeid=null;
+  currentCoeId=null;
 
   document.getElementById('app').style.display='none';
   document.getElementById('login-screen').style.display='flex';
@@ -1368,7 +1368,11 @@ function renderAdmin(){
     <button class="nav-tab" onclick="adminTab('all-pi',this)">Pre-Incubation</button>
     <button class="nav-tab" onclick="adminTab('all-td',this)">Technology Development</button>
     <button class="nav-tab" onclick="adminTab('all-fw',this)">Fellowships</button>
-    <button class="nav-tab" onclick="adminTab('all-log',this)">Progress Logs</button>`;
+    <button class="nav-tab" onclick="adminTab('all-log',this)">Progress Logs</button>
+    <button class="nav-tab"
+onclick="adminTab('announcements',this)">
+📢 Announcements
+</button>`;
   adminTab('overview', nb.children[0]);
 }
 
@@ -1381,6 +1385,7 @@ function adminTab(t,el){
   else if(t==='all-td')  c.innerHTML = adminAllTD();
   else if(t==='all-fw')  c.innerHTML = adminAllFW();
   else if(t==='all-log') c.innerHTML = adminAllLog();
+  else if(t==='announcements') adminAnnouncements();
 }
 
 function adminOverview(){
@@ -1393,10 +1398,17 @@ function adminOverview(){
     totBudget += coe.budget;
   });
   const totUsed = totPI+totTD+totFW;
+  const totRemaining = totBudget - totUsed;
   const pct = totBudget>0 ? Math.round(totUsed/totBudget*100) : 0;
   let html=`<div class="cards-row">
     <div class="mc mc-accent"><div class="mc-label">Total Sanctioned Budget (FY ${new Date().getFullYear()}-${String(new Date().getFullYear()+1).slice(-2)})</div><div class="mc-val">${fmt(totBudget)}</div><div class="mc-sub">across 9 CoEs</div></div>
-    <div class="mc"><div class="mc-label">Total Utilised</div><div class="mc-val">${fmt(totUsed)}</div><div class="mc-sub">${pct}% of budget</div></div>
+    <div class="mc" style="border-left:4px solid var(--success)">
+  <div class="mc-label">Remaining Budget</div>
+  <div class="mc-val" style="color:var(--success)">
+    ${fmt(totRemaining)}
+  </div>
+  <div class="mc-sub">${100-pct}% of budget left</div>
+</div>
     <div class="mc"><div class="mc-label">Pre-Incubation</div><div class="mc-val">${fmt(totPI)}</div><div class="mc-sub">${COE_LIST.reduce((s,c)=>s+getDB(c.id).preInc.length,0)} startups</div></div>
     <div class="mc"><div class="mc-label">Tech Development</div><div class="mc-val">${fmt(totTD)}</div><div class="mc-sub">${COE_LIST.reduce((s,c)=>s+getDB(c.id).techDev.length,0)} projects</div></div>
     <div class="mc"><div class="mc-label">Fellowships</div><div class="mc-val">${fmt(totFW)}</div><div class="mc-sub">${COE_LIST.reduce((s,c)=>s+getDB(c.id).fellows.length,0)} fellows</div></div>
@@ -1408,11 +1420,21 @@ function adminOverview(){
     const used = d.preInc.reduce((s,e)=>s+(e.moneyGiven||0),0) + d.techDev.reduce((s,e)=>s+(e.moneyGiven||0),0) + d.fellows.length*FW_FIXED;
     const pct2 = Math.round(used/coe.budget*100);
     const fundLabel = `Fund Given: ${fmt(coe.budget)}`;
+    const cicFundLine = coe.cicFund ? `
+<div class="coe-row" style="margin-top:2px">
+  <span style="color:var(--text-tertiary);font-size:11px">
+    Additional Fund Given for CIC:
+  </span>
+  <span style="color:var(--secondary);font-weight:700;font-size:11px">
+    ${fmt(coe.cicFund)}
+  </span>
+</div>` : '';
     const tierCls   = {A:'tier-a',B:'tier-b',C:'tier-c'}[coe.tier];
     const barColor  = pct2>=90?'#B91C1C':pct2>=70?'#D97706':'#B45309';
     const cicName   = (d.cic && d.cic.name) ? d.cic.name : '—';
     html+=`<div class="coe-card" onclick="adminCoEDetail('${coe.id}')">
       <span class="coe-tier ${tierCls}">${fundLabel}</span>
+      ${cicFundLine}
       <h4>${coe.name}</h4>
       <div class="coe-row"><span>Center-In-Charge</span><span style="color:#0B3D91;font-weight:700">${esc(cicName)}</span></div>
       <div class="coe-row"><span>Budget used</span><span>${fmt(used)}</span></div>
@@ -1648,6 +1670,106 @@ function adminAllLog(){
   if(!any) html+=`<div class="empty"><div class="empty-icon">📝</div>No progress logs yet.</div>`;
   return html;
 }
+function adminAnnouncements(){
+
+  let html = `
+  <div class="section-card">
+
+    <h3>Post Announcement</h3>
+
+    <label>
+      <input type="checkbox"
+      onchange="toggleAllCoEs(this)">
+      All
+    </label>
+
+    <div style="margin-top:10px;margin-bottom:15px">
+  `;
+
+  COE_LIST.forEach(coe=>{
+
+    html += `
+      <label style="display:block;margin-bottom:6px">
+        <input type="checkbox"
+        class="ann-coe"
+        value="${coe.id}">
+        ${coe.name}
+      </label>
+    `;
+  });
+
+  html += `
+
+    </div>
+
+    <label>Announcement</label>
+
+    <textarea id="ann-msg"
+    placeholder="Write announcement here"></textarea>
+
+    <div class="modal-footer">
+
+      <button class="btn-save"
+      onclick="postAnnouncement()">
+        Post Announcement
+      </button>
+
+    </div>
+
+  </div>
+  `;
+
+  document.getElementById('main-content').innerHTML = html;
+}
+
+function toggleAllCoEs(el){
+
+  document.querySelectorAll('.ann-coe')
+    .forEach(cb=>cb.checked=el.checked);
+}
+
+function postAnnouncement(){
+
+  const msg =
+    document.getElementById('ann-msg').value.trim();
+
+  if(!msg){
+    alert("Enter announcement");
+    return;
+  }
+
+  const selected =
+    [...document.querySelectorAll('.ann-coe:checked')]
+      .map(e=>e.value);
+
+  if(selected.length===0){
+    alert("Select at least one CoE");
+    return;
+  }
+
+  selected.forEach(id=>{
+
+    const d = getDB(id);
+
+    if(!d.announcements)
+      d.announcements=[];
+      if(!d.unreadAnnouncements)
+  d.unreadAnnouncements=0;
+
+d.unreadAnnouncements++;
+
+    d.announcements.unshift({
+      text: msg,
+      date: new Date().toLocaleString()
+    });
+  });
+
+  saveAll();
+
+  alert("Announcement posted successfully");
+
+  adminAnnouncements();
+}
 
 // CoE VIEW
 function renderCOE(id){
@@ -1658,6 +1780,34 @@ function renderCOE(id){
     <button class="nav-tab" onclick="coeTab('td','${id}',this)">Technology Development</button>
     <button class="nav-tab" onclick="coeTab('fw','${id}',this)">Fellowships</button>
     <button class="nav-tab" onclick="coeTab('log','${id}',this)">Progress Log</button>
+    ${getDB(id).announcements?.length ? `
+<button class="nav-tab"
+onclick="coeTab('ann','${id}',this)">
+
+Announcements
+${getDB(id).unreadAnnouncements>0 ? `
+<span style="
+background:red;
+color:white;
+border-radius:50%;
+padding:2px 7px;
+font-size:11px;
+margin-left:4px;
+font-weight:700;
+">
+${getDB(id).unreadAnnouncements}
+</span>
+` : ''}
+
+</button>
+`
+:
+`
+<button class="nav-tab"
+onclick="coeTab('ann','${id}',this)">
+Announcements
+</button>
+`}
     <button class="nav-tab" onclick="coeTab('cic','${id}',this)">Center-In-Charge</button>`;
   coeTab('dash', id, nb.children[0]);
 }
@@ -1671,6 +1821,8 @@ function coeTab(t,id,el){
   else if(t==='td')  c.innerHTML = coeTD(id);
   else if(t==='fw')  c.innerHTML = coeFW(id);
   else if(t==='log') c.innerHTML = coeLog(id);
+  else if(t==='ann')
+  renderAnnouncements(id);
   else if(t==='cic') c.innerHTML = coeCIC(id);
 }
 
@@ -1758,6 +1910,9 @@ function addPI(id){
   const years = Array.from({length:10},(_,i)=>new Date().getFullYear()-i);
   openModal(`<h3>Add Pre-Incubation Startup</h3>
     <label>Name of the Startup *</label><input id="m-name" placeholder="Startup / Student name">
+    <label>Team Members</label>
+<textarea id="m-team-members"
+placeholder="Enter team member names separated by commas"></textarea>
     <label>Year of Incubation *</label>
     <select id="m-year">${years.map(y=>`<option>${y}</option>`).join('')}</select>
     <label>Area of Work *</label><input id="m-area" placeholder="e.g. Mining automation, Mineral processing">
@@ -2115,6 +2270,70 @@ function saveCIC(id){
   msg.style.display = 'inline';
   setTimeout(()=>{ msg.style.display='none'; }, 3000);
   // Refresh admin CoE cards if needed (data auto-reflects next time admin opens)
+}
+function renderAnnouncements(id){
+const d = getDB(id);
+
+d.unreadAnnouncements = 0;
+
+saveAll();
+setTimeout(()=>{
+
+  document.querySelectorAll('.nav-tab')
+  .forEach(t=>{
+
+    if(t.innerText.includes('Announcements')){
+
+      t.innerHTML='Announcements';
+    }
+  });
+
+},50);
+
+  let html = `
+    <div class="section-card">
+
+      <h3>Announcements</h3>
+  `;
+
+  if(!d.announcements || d.announcements.length===0){
+
+    html += `
+      <div class="empty">
+        No announcements yet
+      </div>
+    `;
+  }
+  else{
+
+    d.announcements.forEach(a=>{
+
+      html += `
+        <div class="log-entry">
+
+          <div class="log-meta">
+            <strong>${a.date}</strong>
+          </div>
+
+          <div class="log-text">
+  ${
+    esc(a.text)
+    .replace(
+      /(https?:\/\/[^\s]+)/g,
+      '<a href="$1" target="_blank" style="color:#0B3D91;font-weight:700">$1</a>'
+    )
+    .replace(/\n/g,'<br>')
+  }
+</div>
+
+        </div>
+      `;
+    });
+  }
+
+  html += `</div>`;
+
+  document.getElementById('main-content').innerHTML = html;
 }
 
 // ── EVENT LISTENERS ──
