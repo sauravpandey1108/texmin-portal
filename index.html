@@ -1159,15 +1159,15 @@ console.log("Firebase Connected Successfully");
 
 
 const COE_LIST = [
-  {id:'nitnag',  name:'TEXMiN-NIT Nagaland Mining CoE',        tier:'A', tdMax:1, fwMax:5,  piMax:3, budget:3000000},
-  {id:'nitmiz',  name:'TEXMiN-NIT Mizoram Mining CoE',         tier:'A', tdMax:1, fwMax:5,  piMax:3, budget:3000000},
-  {id:'nitagt',  name:'TEXMiN-NIT Agartala Mining CoE',        tier:'A', tdMax:1, fwMax:5,  piMax:3, budget:3000000},
-  {id:'iiitman', name:'TEXMiN-IIIT Manipur Mining CoE',        tier:'A', tdMax:1, fwMax:5,  piMax:3, budget:3000000},
-  {id:'vnitnag', name:'TEXMiN-VNIT Nagpur Mining CoE',         tier:'B', tdMax:2, fwMax:10, piMax:5, budget:5800000, cicFund:600000},
-  {id:'iiest',   name:'TEXMiN-IIEST Shibpur Mining CoE',       tier:'B', tdMax:2, fwMax:10, piMax:5, budget:5800000, cicFund:600000},
-  {id:'nitrkl',  name:'TEXMiN-NITRkl-FTBI Mining CoE',        tier:'B', tdMax:2, fwMax:10, piMax:5, budget:5800000, cicFund:600000},
-  {id:'bitsin',  name:'TEXMiN-BIT Sindri Mining CoE',          tier:'B', tdMax:2, fwMax:10, piMax:5, budget:5800000, cicFund:600000},
-  {id:'mahuni',  name:'TEXMiN-Mahendra University Mining CoE', tier:'C', tdMax:2, fwMax:5,  piMax:3, budget:6600000},
+  {id:'nitnag',  name:'TEXMiN-NIT Nagaland Mining CoE',         tdMax:1, fwMax:5,  piMax:3, budget:3000000},
+  {id:'nitmiz',  name:'TEXMiN-NIT Mizoram Mining CoE',          tdMax:1, fwMax:5,  piMax:3, budget:3000000},
+  {id:'nitagt',  name:'TEXMiN-NIT Agartala Mining CoE',         tdMax:1, fwMax:5,  piMax:3, budget:3000000},
+  {id:'iiitman', name:'TEXMiN-IIIT Manipur Mining CoE',         tdMax:1, fwMax:5,  piMax:3, budget:3000000},
+  {id:'vnitnag', name:'TEXMiN-VNIT Nagpur Mining CoE',          tdMax:2, fwMax:10, piMax:5, budget:5800000, cicFund:600000},
+  {id:'iiest',   name:'TEXMiN-IIEST Shibpur Mining CoE',        tdMax:2, fwMax:10, piMax:5, budget:5800000, cicFund:600000},
+  {id:'nitrkl',  name:'TEXMiN-NITRkl-FTBI Mining CoE',          tdMax:2, fwMax:10, piMax:5, budget:5800000, cicFund:600000},
+  {id:'bitsin',  name:'TEXMiN-BIT Sindri Mining CoE',           tdMax:2, fwMax:10, piMax:5, budget:5800000, cicFund:600000},
+  {id:'mahuni',  name:'TEXMiN-Mahendra University Mining CoE',  tdMax:2, fwMax:5,  piMax:3, budget:6600000},
 ];
 
 const TD_MAX_PER = 1500000;
@@ -1574,11 +1574,12 @@ function adminAllPI(){
     any=true;
     html+=`<div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin:14px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--border)">${coe.name}</div>`;
     html+=`<div class="table-wrap"><table class="ftable"><colgroup><col style="width:18%"><col style="width:20%"><col style="width:12%"><col style="width:10%"><col style="width:12%"><col style="width:14%"><col style="width:9%"><col style="width:5%"></colgroup>`;
-    html+=`<tr><th>Startup Name</th><th>Area of Work</th><th>Year</th><th>Given</th><th>Utilized</th><th>Remaining</th><th>Status</th><th>Progress</th></tr>`;
+    html+=`<tr><th>Startup Name</th><th>Team Members</th><th>Area of Work</th><th>Year</th><th>Given</th><th>Utilized</th><th>Remaining</th><th>Status</th><th>Progress</th></tr>`;
     d.preInc.forEach(e=>{
       const given = e.moneyGiven||0, util = e.moneyUtilized||0, rem = given-util;
       html+=`<tr>
         <td title="${esc(e.name)}">${esc(e.name)}</td>
+        <td>${esc(e.teamMembers||'—')}</td>
         <td title="${esc(e.areaOfWork||'')}">${esc(e.areaOfWork||'—')}</td>
         <td>${esc(e.yearOfIncubation||'—')}</td>
         <td style="font-family:'DM Mono',monospace">${fmt(given)}</td>
@@ -1932,7 +1933,10 @@ placeholder="Enter team member names separated by commas"></textarea>
 
 function savePI(id){
   const coe=COE_LIST.find(c=>c.id===id), d=getDB(id);
-  const name=v('m-name'), year=v('m-year'), area=v('m-area');
+  const name=v('m-name'),
+teamMembers=v('m-team-members'),
+year=v('m-year'),
+area=v('m-area');
   const milestones=v('m-milestones'), achievements=v('m-achievements');
   const given=parseInt(v('m-given')||0), utilized=parseInt(v('m-utilized')||0);
   const progressReport=v('m-progress-report'), prog=Math.min(100,parseInt(v('m-prog')||0));
@@ -1942,7 +1946,10 @@ function savePI(id){
   if(given>PI_MAX_PER){ alert('Max ₹2,00,000 per startup.'); return; }
   const budgetUsed = d.preInc.reduce((s,e)=>s+(e.moneyGiven||0),0);
   if(budgetUsed+given>coe.piMax*PI_MAX_PER){ alert('Would exceed total pre-incubation budget.'); return; }
-  d.preInc.push({name,yearOfIncubation:year,areaOfWork:area,milestones,achievements,moneyGiven:given,moneyUtilized:utilized,progressReport,progress:prog,status});
+  d.preInc.push({
+  name,
+  teamMembers,
+  yearOfIncubation:year,areaOfWork:area,milestones,achievements,moneyGiven:given,moneyUtilized:utilized,progressReport,progress:prog,status});
   saveAll(); closeModal(); coeTab('pi',id,getActiveTab());
 }
 
@@ -1951,6 +1958,8 @@ function editPI(id,i){
   const years = Array.from({length:10},(_,k)=>new Date().getFullYear()-k);
   openModal(`<h3>Edit Pre-Incubation Entry</h3>
     <label>Name of the Startup *</label><input id="m-name" value="${esc(e.name)}">
+    <label>Team Members</label>
+<textarea id="m-team-members">${esc(e.teamMembers||'')}</textarea>
     <label>Year of Incubation *</label>
     <select id="m-year">${years.map(y=>`<option${y==e.yearOfIncubation?' selected':''}>${y}</option>`).join('')}</select>
     <label>Area of Work</label><input id="m-area" value="${esc(e.areaOfWork||'')}">
@@ -1976,14 +1985,17 @@ function editPI(id,i){
 
 function updPI(id,i){
   if(!confirm('Update this pre-incubation entry?')) return;
-  const name=v('m-name'), year=v('m-year'), area=v('m-area');
+  const name=v('m-name'),
+teamMembers=v('m-team-members'),
+year=v('m-year'),
+area=v('m-area');
   const milestones=v('m-milestones'), achievements=v('m-achievements');
   const given=parseInt(v('m-given')||0), utilized=parseInt(v('m-utilized')||0);
   const progressReport=v('m-progress-report'), prog=Math.min(100,parseInt(v('m-prog')||0)), status=v('m-status');
   if(!name.trim()){ alert('Name is required.'); return; }
   if(isNaN(given)||given<=0){ alert('Amount must be > 0.'); return; }
   if(given>PI_MAX_PER){ alert('Max ₹2,00,000.'); return; }
-  Object.assign(getDB(id).preInc[i],{name,yearOfIncubation:year,areaOfWork:area,milestones,achievements,moneyGiven:given,moneyUtilized:utilized,progressReport,progress:prog,status});
+  Object.assign(getDB(id).preInc[i],{name,teamMembers,yearOfIncubation:year,areaOfWork:area,milestones,achievements,moneyGiven:given,moneyUtilized:utilized,progressReport,progress:prog,status});
   saveAll(); closeModal(); coeTab('pi',id,getActiveTab());
 }
 
