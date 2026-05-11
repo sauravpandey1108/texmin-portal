@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" href="data:,">
   <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
 
 <script>
@@ -1187,13 +1188,111 @@ function loadAll(){
     if(raw) DB = JSON.parse(raw);
   }catch(e){ DB={}; }
 }
-function saveAll(){
-  try{ localStorage.setItem('txm_outreach_v3', JSON.stringify(DB)); }catch(e){}
+async function saveAll(){
+
+  try{
+    localStorage.setItem(
+      'txm_outreach_v3',
+      JSON.stringify(DB)
+    );
+  } catch(e){}
+
+  try{
+
+    if(currentCoeId){
+
+      await saveFirestoreDB(currentCoeId);
+    }
+
+  } catch(e){
+
+    console.error("saveAll Firestore Error:", e);
+  }
 }
 
 function getDB(id){
   if(!DB[id]) DB[id]={preInc:[],techDev:[],fellows:[],updates:[],unreadAnnouncements:0,};
   return DB[id];
+}
+
+async function loadFirestoreDB(id){
+
+  try{
+
+    const docRef = firebase.firestore()
+      .collection("portalData")
+      .doc(id);
+
+    const docSnap = await docRef.get();
+
+    if(docSnap.exists){
+
+      DB[id] = docSnap.data();
+
+    } else {
+
+      DB[id] = {
+        preInc: [],
+        techDev: [],
+        fellows: [],
+        updates: [],
+        unreadAnnouncements: 0
+      };
+
+      await docRef.set(DB[id]);
+    }
+
+  } catch(e){
+
+    console.error("Firestore Load Error:", e);
+  }
+}
+
+async function saveFirestoreDB(id){
+
+  try{
+
+    await firebase.firestore()
+      .collection("portalData")
+      .doc(id)
+      .set(DB[id]);
+
+  } catch(e){
+
+    console.error("Firestore Save Error:", e);
+  }
+}
+
+function listenFirestoreDB(id){
+
+  firebase.firestore()
+    .collection("portalData")
+    .doc(id)
+    .onSnapshot((doc)=>{
+
+      if(doc.exists){
+
+        DB[id] = doc.data();
+
+        console.log(
+          "Realtime Firestore Sync:",
+          id
+        );
+
+        // refresh UI automatically
+        if(currentCoeId === id){
+
+          renderCOE(id);
+        }
+      }
+
+    }, (error)=>{
+
+      console.error(
+        "Realtime Listener Error:",
+        error
+      );
+    });
 }
 
 //UI UTILS
@@ -1230,6 +1329,14 @@ function togglePw(){
 
 async function doLogin(){
 
+  const loginBtn = document.querySelector('.btn-login');
+
+  // show loading state
+  loginBtn.disabled = true;
+  loginBtn.innerHTML = 'Signing In...';
+  loginBtn.style.opacity = '0.7';
+  loginBtn.style.cursor = 'not-allowed';
+
   const email = document.getElementById('inp-id').value.trim();
   const password = document.getElementById('inp-pw').value.trim();
   const err = document.getElementById('login-err');
@@ -1252,6 +1359,13 @@ async function doLogin(){
 
       err.style.display='block';
       err.textContent='User data not found';
+
+      // restore button
+      loginBtn.disabled = false;
+      loginBtn.innerHTML = 'Sign In →';
+      loginBtn.style.opacity = '1';
+      loginBtn.style.cursor = 'pointer';
+
       return;
     }
 
@@ -1291,6 +1405,10 @@ async function doLogin(){
       document.getElementById('tb-user').textContent =
         data.name || user.email;
 
+      await loadFirestoreDB(data.coeId);
+
+      listenFirestoreDB(data.coeId);
+
       renderCOE(data.coeId);
     }
 
@@ -1300,6 +1418,12 @@ async function doLogin(){
 
     err.style.display='block';
     err.textContent = e.message;
+
+    // restore button after failure
+    loginBtn.disabled = false;
+    loginBtn.innerHTML = 'Sign In →';
+    loginBtn.style.opacity = '1';
+    loginBtn.style.cursor = 'pointer';
   }
 }
 
@@ -1332,7 +1456,7 @@ function openForgot(){
   `);
 }
 function submitForgot(){
-  alert("clicked");
+
   const id = document.getElementById('fp-id').value.trim();
   const remark = document.getElementById('fp-remark').value.trim();
 
@@ -1341,25 +1465,54 @@ function submitForgot(){
     return;
   }
 
+  // CoE full name mapping
+  const coeMap = {
+    "nitnag@texmin.in":  "NIT Nagaland Mining CoE",
+    "nitmiz@texmin.in":  "NIT Mizoram Mining CoE",
+    "nitagt@texmin.in":  "NIT Agartala Mining CoE",
+    "iiitman@texmin.in": "IIIT Manipur Mining CoE",
+    "vnit@texmin.in": "VNIT Nagpur Mining CoE",
+    "iiest@texmin.in":   "IIEST Shibpur Mining CoE",
+    "nitrkl@texmin.in":  "NIT Rourkela FTBI Mining CoE",
+    "bitsin@texmin.in":  "BIT Sindri Mining CoE",
+    "mahuni@texmin.in":  "Mahendra University Mining CoE"
+  };
+
+  const coeName =
+    coeMap[id.toLowerCase()] || "Unknown CoE";
+
   emailjs.send(
-    "service_h17kqzi",   // service ID
-    "o6bns59",           // TEMPLATE ID (EmailJS)
+    "service_h17kqzi",
+    "template_9isegvl",
     {
       login_id: id,
       remarks: remark || "N/A",
-      time: new Date().toLocaleString()
+      time: new Date().toLocaleString(),
+
+      from_name: "TEXMiN Portal - " + coeName,
+      reply_to: id
     }
   )
-  .then(function(){
+  .then(function(response){
+
+    console.log("SUCCESS!", response);
+
     alert("Request sent to IT Admin successfully");
+
     closeModal();
+
   })
   .catch(function(error){
-    console.error("EmailJS Error:", error);
-    alert("Failed to send request");
+
+    console.error("EmailJS FULL ERROR:", error);
+
+    alert(
+      "Email Failed\n\n" +
+      "Status: " + error.status + "\n" +
+      "Text: " + error.text
+    );
   });
 }
-
 // ADMIN
 function renderAdmin(){
   const nb = document.getElementById('nav-bar');
