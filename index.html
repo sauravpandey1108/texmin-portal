@@ -1116,7 +1116,7 @@ console.log("Firebase Connected Successfully");
       <label>Password</label>
       <div class="pw-wrap">
         <input id="inp-pw" type="password" placeholder="Enter your password" autocomplete="current-password">
-        <button class="pw-toggle" onclick="togglePw()" id="pw-btn">Show</button>
+        <!--<button class="pw-toggle" onclick="togglePw()" id="pw-btn">👁</button>-->
       </div>
       <div style="text-align:right; margin-bottom:10px;">
   <a href="#" onclick="openForgot()" 
@@ -1180,6 +1180,8 @@ const TRL_LEVELS = ['TRL 1 – Basic principles','TRL 2 – Technology concept',
 let DB = {};
 let currentUser = null;
 let currentCoeId = null;
+let currentUserData = null;
+let unsubscribeDB = null;
 
 //STORAGE (localStorage)
 function loadAll(){
@@ -1265,7 +1267,7 @@ async function saveFirestoreDB(id){
 
 function listenFirestoreDB(id){
 
-  firebase.firestore()
+  const unsubscribe = firebase.firestore()
     .collection("portalData")
     .doc(id)
     .onSnapshot((doc)=>{
@@ -1293,6 +1295,7 @@ function listenFirestoreDB(id){
         error
       );
     });
+    return unsubscribe;
 }
 
 //UI UTILS
@@ -1370,6 +1373,7 @@ async function doLogin(){
     }
 
     const data = doc.data();
+    currentUserData = data;
 
     currentUser = user.email;
 
@@ -1407,7 +1411,9 @@ async function doLogin(){
 
       await loadFirestoreDB(data.coeId);
 
-      listenFirestoreDB(data.coeId);
+      if(unsubscribeDB) unsubscribeDB();
+
+      unsubscribeDB = listenFirestoreDB(data.coeId);
 
       renderCOE(data.coeId);
     }
@@ -1425,11 +1431,27 @@ async function doLogin(){
     loginBtn.style.opacity = '1';
     loginBtn.style.cursor = 'pointer';
   }
+  finally{
+
+  loginBtn.disabled = false;
+
+  loginBtn.innerHTML = 'Sign In →';
+
+  loginBtn.style.opacity = '1';
+
+  loginBtn.style.cursor = 'pointer';
 }
+}
+
 
 function doLogout(){
   currentUser=null; 
   currentCoeId=null;
+  currentUserData = null;
+  if(unsubscribeDB){
+  unsubscribeDB();
+  unsubscribeDB = null;
+}
 
   document.getElementById('app').style.display='none';
   document.getElementById('login-screen').style.display='flex';
