@@ -515,6 +515,7 @@ label {
 .mc-label {
   font-size: 11px;
   font-weight: 600;
+  margin-bottom:8px;
   color: var(--text-secondary);
   margin-bottom: var(--space-sm);
   text-transform: uppercase;
@@ -1078,7 +1079,19 @@ console.log("Firebase Connected Successfully");
 <h2 class="sr-only">TEXMiN Foundation — Outreach CoE Management Portal</h2>
 
 <!-- LOGIN -->
-<div id="login-screen">
+ <div id="auth-loading"
+style="
+height:100vh;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:20px;
+font-weight:600;
+background:#f8fafc;
+">
+Loading...
+</div>
+<div id="login-screen" style="display:none;">
   <div class="login-inner">
     <!--ADD THIS WRAPPER -->
   <div class="brand-strip">
@@ -1132,7 +1145,7 @@ console.log("Firebase Connected Successfully");
 </div>
 
 <!-- APP -->
-<div id="app">
+<div id="app" style="display:none;">
   <div class="topbar">
     <div class="topbar-left">
       <div class="tb-icon"><svg viewBox="0 0 20 20"><path d="M10 2L3 7v11h5v-5h4v5h5V7L10 2z"/></svg></div>
@@ -1158,7 +1171,6 @@ console.log("Firebase Connected Successfully");
 <script>
 //AUTH DATA
 
-
 const COE_LIST = [
   {id:'nitnag',  name:'TEXMiN-NIT Nagaland Mining CoE',         tdMax:1, fwMax:5,  piMax:3, budget:3000000},
   {id:'nitmiz',  name:'TEXMiN-NIT Mizoram Mining CoE',          tdMax:1, fwMax:5,  piMax:3, budget:3000000},
@@ -1181,6 +1193,7 @@ let DB = {};
 let currentUser = null;
 let currentCoeId = null;
 let currentUserData = null;
+let currentFY = '2026-27';
 let unsubscribeDB = null;
 
 function loadAll(){
@@ -1202,8 +1215,63 @@ try{
 }
 
 function getDB(id){
-  if(!DB[id]) DB[id]={preInc:[],techDev:[],fellows:[],updates:[],unreadAnnouncements:0,};
-  return DB[id];
+
+  if(!DB[id]){
+    DB[id] = {};
+  }
+
+  // Create FY container
+  if(!DB[id].fyData){
+    DB[id].fyData = {};
+  }
+
+  // MIGRATE OLD DATA AUTOMATICALLY
+  if(
+
+    !DB[id].fyData[currentFY]
+
+    &&
+
+    (
+      DB[id].preInc ||
+      DB[id].techDev ||
+      DB[id].fellows ||
+      DB[id].updates
+    )
+
+  ){
+
+    DB[id].fyData[currentFY] = {
+
+      preInc: DB[id].preInc || [],
+      techDev: DB[id].techDev || [],
+      fellows: DB[id].fellows || [],
+      updates: DB[id].updates || [],
+      unreadAnnouncements:
+        DB[id].unreadAnnouncements || 0,
+
+      budget: 5800000
+
+    };
+
+  }
+
+  // Create empty FY if still absent
+  if(!DB[id].fyData[currentFY]){
+
+    DB[id].fyData[currentFY] = {
+
+      preInc: [],
+      techDev: [],
+      fellows: [],
+      updates: [],
+      unreadAnnouncements: 0,
+      budget: 5800000
+
+    };
+  }
+
+  return DB[id].fyData[currentFY];
 }
 
 async function loadFirestoreDB(id){
@@ -1318,6 +1386,95 @@ function togglePw(){
 }
 
 //LOGIN / LOGOUT
+async function handleUserSession(user){
+  document.getElementById('auth-loading').style.display='none';
+
+  if(!user){
+
+    currentUser = null;
+    currentCoeId = null;
+    currentUserData = null;
+
+    if(unsubscribeDB){
+      unsubscribeDB();
+      unsubscribeDB = null;
+    }
+
+    document.getElementById('app').style.display='none';
+    document.getElementById('login-screen').style.display='flex';
+    document.getElementById('auth-loading').style.display='none';
+
+    return;
+  }
+
+  try{
+
+    const doc = await firebase.firestore()
+      .collection("users")
+      .doc(user.email)
+      .get();
+
+    if(!doc.exists){
+
+      console.error("User profile not found");
+      return;
+    }
+
+    const data = doc.data();
+
+    currentUserData = data;
+    currentUser = user.email;
+
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='block';
+
+    const badge = document.getElementById('tb-badge');
+
+    if(data.role === 'admin'){
+
+      document.getElementById('tb-title').textContent =
+        'TEXMiN Foundation ⛏ CoE Dashboard';
+
+      badge.className='tb-badge badge-admin';
+      badge.textContent='ADMIN';
+
+      document.getElementById('tb-user').textContent =
+        data.name || user.email;
+
+
+      renderAdmin();
+
+    } else {
+
+      const coe = COE_LIST.find(c => c.id === data.coeId);
+
+      currentCoeId = data.coeId;
+
+      document.getElementById('tb-title').textContent =
+        coe.name;
+
+      badge.className='tb-badge badge-coe';
+      badge.textContent='CoE • Tier ' + coe.tier;
+
+      document.getElementById('tb-user').textContent =
+        data.name || user.email;
+
+      await loadFirestoreDB(data.coeId);
+
+      if(unsubscribeDB){
+        unsubscribeDB();
+      }
+
+      unsubscribeDB = listenFirestoreDB(data.coeId);
+
+      renderCOE(data.coeId);
+    }
+
+  } catch(e){
+
+    console.error("Session Restore Error:", e);
+  }
+}
 
 async function doLogin(){
 
@@ -1342,70 +1499,7 @@ async function doLogin(){
 
     const user = userCredential.user;
 
-    const doc = await firebase.firestore()
-      .collection("users")
-      .doc(user.email)
-      .get();
-
-    if(!doc.exists){
-
-      err.style.display='block';
-      err.textContent='User data not found';
-
-      // restore button
-      loginBtn.disabled = false;
-      loginBtn.innerHTML = 'Sign In →';
-      loginBtn.style.opacity = '1';
-      loginBtn.style.cursor = 'pointer';
-
-      return;
-    }
-
-    const data = doc.data();
-    currentUserData = data;
-
-    currentUser = user.email;
-
-    document.getElementById('login-screen').style.display='none';
-    document.getElementById('app').style.display='block';
-
-    const badge = document.getElementById('tb-badge');
-
-    if(data.role === 'admin'){
-
-      document.getElementById('tb-title').textContent =
-        'TEXMiN Foundation ⛏ CoE Dashboard';
-
-      badge.className='tb-badge badge-admin';
-      badge.textContent='ADMIN';
-
-      document.getElementById('tb-user').textContent =
-        data.name || user.email;
-
-      renderAdmin();
-
-    } else {
-
-      const coe = COE_LIST.find(c=>c.id===data.coeId);
-
-      currentCoeId = data.coeId;
-
-      document.getElementById('tb-title').textContent = coe.name;
-
-      badge.className='tb-badge badge-coe';
-      badge.textContent='CoE • Tier '+coe.tier;
-
-      document.getElementById('tb-user').textContent =
-        data.name || user.email;
-
-      await loadFirestoreDB(data.coeId);
-
-      if(unsubscribeDB) unsubscribeDB();
-
-      unsubscribeDB = listenFirestoreDB(data.coeId);
-
-      renderCOE(data.coeId);
-    }
+    await handleUserSession(user);
 
   } catch(e){
 
@@ -1414,42 +1508,38 @@ async function doLogin(){
     err.style.display='block';
     err.textContent = e.message;
 
-    // restore button after failure
+  } finally {
+
     loginBtn.disabled = false;
+
     loginBtn.innerHTML = 'Sign In →';
+
     loginBtn.style.opacity = '1';
+
     loginBtn.style.cursor = 'pointer';
   }
-  finally{
-
-  loginBtn.disabled = false;
-
-  loginBtn.innerHTML = 'Sign In →';
-
-  loginBtn.style.opacity = '1';
-
-  loginBtn.style.cursor = 'pointer';
-}
 }
 
+async function doLogout(){
 
-function doLogout(){
-  currentUser=null; 
-  currentCoeId=null;
+  await firebase.auth().signOut();
+
+  currentUser = null;
+  currentCoeId = null;
   currentUserData = null;
-  if(unsubscribeDB){
-  unsubscribeDB();
-  unsubscribeDB = null;
-}
 
-  document.getElementById('app').style.display='none';
-  document.getElementById('login-screen').style.display='flex';
+  if(unsubscribeDB){
+    unsubscribeDB();
+    unsubscribeDB = null;
+  }
 
   document.getElementById('inp-id').value='';
   document.getElementById('inp-pw').value='';
+
   document.getElementById('nav-bar').innerHTML='';
   document.getElementById('main-content').innerHTML='';
 }
+
 function openForgot(){
   openModal(`
     <h3>Forgot Password</h3>
@@ -1465,6 +1555,22 @@ function openForgot(){
       <button class="btn-save" onclick="submitForgot()">Submit</button>
     </div>
   `);
+}
+
+function changeFY(fy){
+
+  currentFY = fy;
+
+  console.log("Current FY:", currentFY);
+
+  if(currentUserData?.role === 'admin'){
+
+    renderAdmin();
+
+  } else {
+
+    renderCOE(currentCoeId);
+  }
 }
 function submitForgot(){
 
@@ -1525,8 +1631,32 @@ function submitForgot(){
   });
 }
 // ADMIN
-function renderAdmin(){
+async function loadAllPortalData(){
+
+  try{
+
+    const snapshot = await firebase.firestore()
+      .collection("portalData")
+      .get();
+
+    snapshot.forEach(doc=>{
+
+      DB[doc.id] = doc.data();
+
+    });
+
+    console.log("Admin Firestore Sync Complete");
+
+  }catch(e){
+
+    console.error("Admin Load Error:", e);
+
+  }
+}
+async function renderAdmin(){
   const nb = document.getElementById('nav-bar');
+  await loadAllPortalData();
+
   nb.innerHTML=`
     <button class="nav-tab active" onclick="adminTab('overview',this)">Overview</button>
     <button class="nav-tab" onclick="adminTab('all-pi',this)">Pre-Incubation</button>
@@ -1565,7 +1695,41 @@ function adminOverview(){
   const totRemaining = totBudget - totUsed;
   const pct = totBudget>0 ? Math.round(totUsed/totBudget*100) : 0;
   let html=`<div class="cards-row">
-    <div class="mc mc-accent"><div class="mc-label">Total Sanctioned Budget (FY ${new Date().getFullYear()}-${String(new Date().getFullYear()+1).slice(-2)})</div><div class="mc-val">${fmt(totBudget)}</div><div class="mc-sub">across 9 CoEs</div></div>
+    <div class="mc mc-accent">
+
+  <div class="mc-label">
+    Total Sanctioned Budget
+  </div>
+
+  <select id="admin-fy-select"
+    onchange="changeFY(this.value)"
+    style="
+      margin-top:2px;
+      padding:2px 6px;
+      border-radius:5px;
+      border:1px solid #d1d5db;
+      font-size:10px;
+      font-weight:600;
+      cursor:pointer;
+      width:100px;
+      background:#fff;
+    ">
+
+    <option value="2025-26">FY 2025-26</option>
+    <option value="2026-27" selected>FY 2026-27</option>
+    <option value="2027-28">FY 2027-28</option>
+
+  </select>
+
+  <div class="mc-val">
+    ${fmt(totBudget)}
+  </div>
+
+  <div class="mc-sub">
+    across 9 CoEs
+  </div>
+
+</div>
     <div class="mc" style="border-left:4px solid var(--success)">
   <div class="mc-label">Remaining Budget</div>
   <div class="mc-val" style="color:var(--success)">
@@ -2003,7 +2167,31 @@ function coeDash(id){
   const tdMax = coe.tdMax*TD_MAX_PER;
   const fwMax = coe.fwMax*FW_FIXED;
   let html=`<div class="cards-row">
-    <div class="mc mc-accent"><div class="mc-label">Total Sanctioned Budget (FY ${new Date().getFullYear()}-${String(new Date().getFullYear()+1).slice(-2)})</div><div class="mc-val">${fmt(coe.budget)}</div><div class="mc-sub">sanctioned</div></div>
+    <div class="mc mc-accent"><div class="mc-label">Total Sanctioned Budget <br>
+
+<select id="fy-select"
+onchange="changeFY(this.value)"
+style="
+margin-top:2px;
+padding:2px 6px;
+border-radius:5px;
+border:1px solid #d1d5db;
+font-size:10px;
+font-weight:600;
+cursor:pointer;
+width:100px;
+background:#fff;
+">
+
+<option value="2025-26">
+FY 2025-26
+</option>
+
+<option value="2026-27" selected>
+FY 2026-27
+</option>
+
+</select></div><div class="mc-val">${fmt(coe.budget)}</div><div class="mc-sub">sanctioned</div></div>
     <div class="mc"><div class="mc-label">Utilised</div><div class="mc-val">${fmt(used)}</div><div class="mc-sub">${pct}% of budget</div></div>
     <div class="mc"><div class="mc-label">Pre-Incubation</div><div class="mc-val">${fmt(piA)}</div><div class="mc-sub">${d.preInc.length}/${coe.piMax} startups</div></div>
     <div class="mc"><div class="mc-label">Technology Development</div><div class="mc-val">${fmt(tdA)}</div><div class="mc-sub">${d.techDev.length}/${coe.tdMax} projects</div></div>
@@ -2528,6 +2716,11 @@ document.getElementById('inp-id').addEventListener('keydown',function(e){
 
 //INIT
 loadAll();
+firebase.auth().onAuthStateChanged(async(user)=>{
+
+  await handleUserSession(user);
+
+});
 </script>
 </body>
 </html>
