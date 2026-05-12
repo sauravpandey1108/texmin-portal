@@ -12,6 +12,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TEXMiN Foundation — Outreach CoE Portal</title>
+<link rel="icon" type="image/png" href="favicon-48.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=Nunito+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -1194,6 +1195,10 @@ let currentUser = null;
 let currentCoeId = null;
 let currentUserData = null;
 let currentFY = '2026-27';
+let FY_BUDGETS = {
+  "2025-26": 0,
+  "2026-27": 41800000
+};
 let unsubscribeDB = null;
 
 function loadAll(){
@@ -1220,54 +1225,44 @@ function getDB(id){
     DB[id] = {};
   }
 
-  // Create FY container
   if(!DB[id].fyData){
     DB[id].fyData = {};
   }
 
-  // MIGRATE OLD DATA AUTOMATICALLY
-  if(
-
-    !DB[id].fyData[currentFY]
-
-    &&
-
-    (
-      DB[id].preInc ||
-      DB[id].techDev ||
-      DB[id].fellows ||
-      DB[id].updates
-    )
-
-  ){
-
-    DB[id].fyData[currentFY] = {
-
-      preInc: DB[id].preInc || [],
-      techDev: DB[id].techDev || [],
-      fellows: DB[id].fellows || [],
-      updates: DB[id].updates || [],
-      unreadAnnouncements:
-        DB[id].unreadAnnouncements || 0,
-
-      budget: 5800000
-
-    };
-
-  }
-
-  // Create empty FY if still absent
   if(!DB[id].fyData[currentFY]){
 
     DB[id].fyData[currentFY] = {
+      preInc:[],
+      techDev:[],
+      fellows:[],
+      updates:[],
+      unreadAnnouncements:0
+    };
+  }
 
-      preInc: [],
-      techDev: [],
-      fellows: [],
-      updates: [],
-      unreadAnnouncements: 0,
-      budget: 5800000
+  console.log("getDB FY:", currentFY);
 
+  return DB[id].fyData[currentFY];
+}
+
+function createFYData(id){
+
+  if(!DB[id]){
+    DB[id] = {};
+  }
+
+  if(!DB[id].fyData){
+    DB[id].fyData = {};
+  }
+
+  if(!DB[id].fyData[currentFY]){
+
+    DB[id].fyData[currentFY] = {
+      preInc:[],
+      techDev:[],
+      fellows:[],
+      updates:[],
+      unreadAnnouncements:0
     };
   }
 
@@ -1288,14 +1283,44 @@ async function loadFirestoreDB(id){
 
       DB[id] = docSnap.data();
 
+      // MIGRATE OLD DATA STRUCTURE
+      if(!DB[id].fyData){
+
+        DB[id].fyData = {};
+
+        DB[id].fyData["2026-27"] = {
+
+          preInc: DB[id].preInc || [],
+          techDev: DB[id].techDev || [],
+          fellows: DB[id].fellows || [],
+          updates: DB[id].updates || [],
+          unreadAnnouncements: DB[id].unreadAnnouncements || 0
+        };
+
+        // Optional cleanup
+        delete DB[id].preInc;
+        delete DB[id].techDev;
+        delete DB[id].fellows;
+        delete DB[id].updates;
+        delete DB[id].unreadAnnouncements;
+
+        await docRef.set(DB[id]);
+
+        console.log("FY Migration Complete:", id);
+      }
+
     } else {
 
       DB[id] = {
-        preInc: [],
-        techDev: [],
-        fellows: [],
-        updates: [],
-        unreadAnnouncements: 0
+        fyData:{
+          "2026-27":{
+            preInc: [],
+            techDev: [],
+            fellows: [],
+            updates: [],
+            unreadAnnouncements: 0
+          }
+        }
       };
 
       await docRef.set(DB[id]);
@@ -1310,6 +1335,18 @@ async function loadFirestoreDB(id){
 async function saveFirestoreDB(id){
 
   try{
+
+    // Ensure structure exists
+    if(!DB[id]){
+      DB[id] = {};
+    }
+
+    if(!DB[id].fyData){
+      DB[id].fyData = {};
+    }
+
+    // Save current FY data
+    DB[id].fyData[currentFY] = getDB(id);
 
     await firebase.firestore()
       .collection("portalData")
@@ -1331,7 +1368,25 @@ function listenFirestoreDB(id){
 
       if(doc.exists){
 
-        DB[id] = doc.data();
+        const data = doc.data();
+
+DB[id] = data;
+
+// AUTO FY MIGRATION FOR REALTIME SYNC
+if(!DB[id].fyData){
+
+  DB[id].fyData = {};
+
+  DB[id].fyData["2026-27"] = {
+
+    preInc: DB[id].preInc || [],
+    techDev: DB[id].techDev || [],
+    fellows: DB[id].fellows || [],
+    updates: DB[id].updates || [],
+    unreadAnnouncements:
+      DB[id].unreadAnnouncements || 0
+  };
+}
 
         console.log(
           "Realtime Firestore Sync:",
@@ -1572,6 +1627,18 @@ function changeFY(fy){
     renderCOE(currentCoeId);
   }
 }
+function saveFYBudget(){
+
+  const val = Number(
+    document.getElementById('fy-budget-input').value
+  ) || 0;
+
+  FY_BUDGETS[currentFY] = val;
+
+  alert(`Budget saved for FY ${currentFY}`);
+
+  renderAdmin();
+}
 function submitForgot(){
 
   const id = document.getElementById('fp-id').value.trim();
@@ -1683,27 +1750,85 @@ function adminTab(t,el){
 }
 
 function adminOverview(){
-  let totPI=0,totTD=0,totFW=0,totBudget=0;
+
+  let totPI=0,totTD=0,totFW=0;
+  let totBudget = FY_BUDGETS[currentFY] || 0;
+
+  const isEmptyFY = currentFY !== "2026-27";
+
   COE_LIST.forEach(coe=>{
-    const d=getDB(coe.id);
-    d.preInc.forEach(e=>{ totPI += (e.moneyGiven||0); });
-    d.techDev.forEach(e=>{ totTD += (e.moneyGiven||0); });
-    totFW += d.fellows.length * FW_FIXED;
-    totBudget += coe.budget;
+
+    const d = getDB(coe.id) || {
+      preInc: [],
+      techDev: [],
+      fellows: []
+    };
+
+    if(!isEmptyFY){
+
+      d.preInc.forEach(e=>{
+        totPI += (e.moneyGiven||0);
+      });
+
+      d.techDev.forEach(e=>{
+        totTD += (e.moneyGiven||0);
+      });
+
+      totFW += d.fellows.length * FW_FIXED;
+    }
+
   });
-  const totUsed = totPI+totTD+totFW;
+
+  const totUsed = totPI + totTD + totFW;
   const totRemaining = totBudget - totUsed;
-  const pct = totBudget>0 ? Math.round(totUsed/totBudget*100) : 0;
+  const pct = totBudget > 0
+? Math.round((totUsed / totBudget) * 100)
+: 0;
+
   let html=`<div class="cards-row">
+
     <div class="mc mc-accent">
 
-  <div class="mc-label">
-    Total Sanctioned Budget
-  </div>
+      <div class="mc-label">
+        Total Sanctioned Budget
+      </div>
 
-  <select id="admin-fy-select"
-    onchange="changeFY(this.value)"
-    style="
+      <div style="margin-top:6px">
+
+  <input
+  type="number"
+  id="fy-budget-input"
+  placeholder="Enter FY Budget"
+  value="${totBudget}"
+  style="
+    width:140px;
+    padding:5px 8px;
+    border:1px solid #d1d5db;
+    border-radius:6px;
+    font-size:11px;
+    margin-top:4px;
+  ">
+
+  <button
+  onclick="saveFYBudget()"
+  style="
+    margin-left:4px;
+    padding:5px 10px;
+    border:none;
+    border-radius:6px;
+    background:#0B3D91;
+    color:white;
+    font-size:11px;
+    cursor:pointer;
+  ">
+    Save
+  </button>
+
+</div>
+
+      <select id="fy-select"
+      onchange="changeFY(this.value)"
+      style="
       margin-top:2px;
       padding:2px 6px;
       border-radius:5px;
@@ -1713,118 +1838,193 @@ function adminOverview(){
       cursor:pointer;
       width:100px;
       background:#fff;
-    ">
+      ">
 
-    <option value="2025-26">FY 2025-26</option>
-    <option value="2026-27" selected>FY 2026-27</option>
-    <option value="2027-28">FY 2027-28</option>
+      <option value="2025-26" ${currentFY==="2025-26"?"selected":""}>
+      FY 2025-26
+      </option>
 
-  </select>
+      <option value="2026-27" ${currentFY==="2026-27"?"selected":""}>
+      FY 2026-27
+      </option>
 
-  <div class="mc-val">
-    ${fmt(totBudget)}
-  </div>
+      </select>
 
-  <div class="mc-sub">
-    across 9 CoEs
-  </div>
-
-</div>
-    <div class="mc" style="border-left:4px solid var(--success)">
-  <div class="mc-label">Remaining Budget</div>
-  <div class="mc-val" style="color:var(--success)">
-    ${fmt(totRemaining)}
-  </div>
-  <div class="mc-sub">${100-pct}% of budget left</div>
-</div>
-    <div class="mc"><div class="mc-label">Pre-Incubation</div><div class="mc-val">${fmt(totPI)}</div><div class="mc-sub">${COE_LIST.reduce((s,c)=>s+getDB(c.id).preInc.length,0)} startups</div></div>
-    <div class="mc"><div class="mc-label">Tech Development</div><div class="mc-val">${fmt(totTD)}</div><div class="mc-sub">${COE_LIST.reduce((s,c)=>s+getDB(c.id).techDev.length,0)} projects</div></div>
-    <div class="mc"><div class="mc-label">Fellowships</div><div class="mc-val">${fmt(totFW)}</div><div class="mc-sub">${COE_LIST.reduce((s,c)=>s+getDB(c.id).fellows.length,0)} fellows</div></div>
-  </div>
-  <div class="sec-head"><span class="sec-head-title">All Outreach Centres</span><span style="font-size:11px;color:var(--text-tertiary)">Click any card to drill down</span></div>
-  <div class="coe-grid">`;
-  COE_LIST.forEach(coe=>{
-    const d=getDB(coe.id);
-    const used = d.preInc.reduce((s,e)=>s+(e.moneyGiven||0),0) + d.techDev.reduce((s,e)=>s+(e.moneyGiven||0),0) + d.fellows.length*FW_FIXED;
-    const pct2 = Math.round(used/coe.budget*100);
-    const fundLabel = `Fund Given: ${fmt(coe.budget)}`;
-    const cicFundLine = coe.cicFund ? `
-<div class="coe-row" style="margin-top:2px">
-  <span style="color:var(--text-tertiary);font-size:11px">
-    Additional Fund Given for CIC:
-  </span>
-  <span style="color:var(--secondary);font-weight:700;font-size:11px">
-    ${fmt(coe.cicFund)}
-  </span>
-</div>` : '';
-    const tierCls   = {A:'tier-a',B:'tier-b',C:'tier-c'}[coe.tier];
-    const barColor  = pct2>=90?'#B91C1C':pct2>=70?'#D97706':'#B45309';
-    const cicName   = (d.cic && d.cic.name) ? d.cic.name : '—';
-    html+=`<div class="coe-card" onclick="adminCoEDetail('${coe.id}')">
-      <span class="coe-tier ${tierCls}">${fundLabel}</span>
-      ${cicFundLine}
-      <h4>${coe.name}</h4>
-      <div class="coe-row"><span>Center-In-Charge</span><span style="color:#0B3D91;font-weight:700">${esc(cicName)}</span></div>
-      <div class="coe-row"><span>Budget used</span><span>${fmt(used)}</span></div>
-      <div class="coe-row"><span>Pre-Incubation</span><span>${d.preInc.length}/${coe.piMax}</span></div>
-      <div class="coe-row"><span>Technology Development</span><span>${d.techDev.length}/${coe.tdMax}</span></div>
-      <div class="coe-row"><span>Fellows</span><span>${d.fellows.length}/${coe.fwMax}</span></div>
-      <div style="margin-top:9px">
-        <div class="prog-wrap slim"><div class="prog-bar slim" style="width:${pct2}%;background:${barColor}"></div></div>
-        <div style="font-size:10px;color:var(--text-tertiary);margin-top:3px">${pct2}% utilised</div>
+      <div class="mc-val">
+        ${fmt(totBudget)}
       </div>
-    </div>`;
-  });
-  html+='</div>';
 
-  // Enhancement 6: Year-wise budget breakdown
-  const years = [2023, 2024, 2025, 2026];
-  const allEntries = [];
+      <div class="mc-sub">
+        across 9 CoEs
+      </div>
+
+    </div>
+
+    <div class="mc" style="border-left:4px solid var(--success)">
+      <div class="mc-label">Remaining Budget</div>
+      <div class="mc-val" style="color:var(--success)">
+        ${fmt(totRemaining)}
+      </div>
+      <div class="mc-sub">${100-pct}% of budget left</div>
+    </div>
+
+    <div class="mc">
+      <div class="mc-label">Pre-Incubation</div>
+      <div class="mc-val">${fmt(totPI)}</div>
+      <div class="mc-sub">
+        ${isEmptyFY ? 0 :
+        COE_LIST.reduce((s,c)=>
+        s + ((getDB(c.id)?.preInc?.length) || 0)
+        ,0)} startups
+      </div>
+    </div>
+
+    <div class="mc">
+      <div class="mc-label">Tech Development</div>
+      <div class="mc-val">${fmt(totTD)}</div>
+      <div class="mc-sub">
+        ${isEmptyFY ? 0 :
+        COE_LIST.reduce((s,c)=>
+        s + ((getDB(c.id)?.techDev?.length) || 0)
+        ,0)} projects
+      </div>
+    </div>
+
+    <div class="mc">
+      <div class="mc-label">Fellowships</div>
+      <div class="mc-val">${fmt(totFW)}</div>
+      <div class="mc-sub">
+        ${isEmptyFY ? 0 :
+        COE_LIST.reduce((s,c)=>
+        s + ((getDB(c.id)?.fellows?.length) || 0)
+        ,0)} fellows
+      </div>
+    </div>
+
+  </div>
+
+  <div class="sec-head">
+    <span class="sec-head-title">All Outreach Centres</span>
+    <span style="font-size:11px;color:var(--text-tertiary)">
+      Click any card to drill down
+    </span>
+  </div>
+
+  <div class="coe-grid">`;
+
   COE_LIST.forEach(coe=>{
-    const d=getDB(coe.id);
-    d.preInc.forEach(e=>{ if(e.yearOfIncubation) allEntries.push({year:parseInt(e.yearOfIncubation), given:e.moneyGiven||0, utilized:e.moneyUtilized||0, type:'pi'}); });
-    d.techDev.forEach(e=>{ if(e.yearOfGrant) allEntries.push({year:parseInt(e.yearOfGrant), given:e.moneyGiven||0, utilized:e.moneyUtilized||0, type:'td'}); });
-    d.fellows.forEach(e=>{ allEntries.push({year:new Date().getFullYear(), given:FW_FIXED, utilized:e.moneyUtilized||0, type:'fw'}); });
+
+    const d = getDB(coe.id) || {
+      preInc: [],
+      techDev: [],
+      fellows: []
+    };
+
+    const cardPI = isEmptyFY ? 0 : (d.preInc || []).length;
+
+    const cardTD = isEmptyFY ? 0 : (d.techDev || []).length;
+
+    const cardFW = isEmptyFY ? 0 : (d.fellows || []).length;
+
+    const cardUsed = isEmptyFY ? 0 : (
+      (d.preInc || []).reduce((s,e)=>s+(e.moneyGiven||0),0)
+      + (d.techDev || []).reduce((s,e)=>s+(e.moneyGiven||0),0)
+      + (d.fellows || []).length * FW_FIXED
+    );
+
+ const pct2 = totBudget > 0
+  ? Math.round((cardUsed / totBudget) * 100)
+  : 0;
+
+ const coeBudget = isEmptyFY ? 0 : coe.budget;
+
+const fundLabel = `Fund Given: ${
+  fmt(coeBudget)
+}`;
+
+    const cicFundLine = coe.cicFund ? `
+    <div class="coe-row" style="margin-top:2px">
+      <span style="color:var(--text-tertiary);font-size:11px">
+        Additional Fund Given for CIC:
+      </span>
+      <span style="color:var(--secondary);font-weight:700;font-size:11px">
+        ${isEmptyFY ? fmt(0) : fmt(coe.cicFund)}
+      </span>
+    </div>` : '';
+
+    const tierCls = {
+      A:'tier-a',
+      B:'tier-b',
+      C:'tier-c'
+    }[coe.tier];
+
+    const barColor = pct2>=90
+      ? '#B91C1C'
+      : pct2>=70
+      ? '#D97706'
+      : '#B45309';
+
+    const cicName = (d.cic && d.cic.name)
+      ? d.cic.name
+      : '—';
+
+    html+=`
+    <div class="coe-card" onclick="adminCoEDetail('${coe.id}')">
+
+      <span class="coe-tier ${tierCls}">
+        ${fundLabel}
+      </span>
+
+      ${cicFundLine}
+
+      <h4>${coe.name}</h4>
+
+      <div class="coe-row">
+        <span>Center-In-Charge</span>
+        <span style="color:#0B3D91;font-weight:700">
+          ${esc(cicName)}
+        </span>
+      </div>
+
+      <div class="coe-row">
+        <span>Budget used</span>
+        <span>${fmt(cardUsed)}</span>
+      </div>
+
+      <div class="coe-row">
+        <span>Pre-Incubation</span>
+        <span>${cardPI}/${coe.piMax}</span>
+      </div>
+
+      <div class="coe-row">
+        <span>Technology Development</span>
+        <span>${cardTD}/${coe.tdMax}</span>
+      </div>
+
+      <div class="coe-row">
+        <span>Fellows</span>
+        <span>${cardFW}/${coe.fwMax}</span>
+      </div>
+
+      <div style="margin-top:9px">
+
+        <div class="prog-wrap slim">
+          <div class="prog-bar slim"
+          style="width:${pct2}%;background:${barColor}">
+          </div>
+        </div>
+
+        <div style="font-size:10px;color:var(--text-tertiary);margin-top:3px">
+          ${pct2}% utilised
+        </div>
+
+      </div>
+
+    </div>`;
+
   });
 
-  const uniqueYears = [...new Set(allEntries.map(e=>e.year).filter(Boolean))].sort();
-  const displayYears = uniqueYears.length>0 ? uniqueYears : years;
-
-  html+=`<div class="sec-head" style="margin-top:1.5rem"><span class="sec-head-title">Year-wise Budget Breakdown</span></div>`;
-  html+=`<div class="table-wrap"><table class="ftable">`;
-  html+=`<tr><th>Year</th><th>Total Budget Allocated</th><th>Amount Utilized</th><th>Remaining</th><th>Utilisation %</th></tr>`;
-
-  let grandTotal=0, grandUtilized=0;
-  displayYears.forEach(yr=>{
-    const yearEntries = allEntries.filter(e=>e.year===yr);
-    const yearGiven    = yearEntries.reduce((s,e)=>s+e.given,0);
-    const yearUtilized = yearEntries.reduce((s,e)=>s+e.utilized,0);
-    const yearRem      = yearGiven - yearUtilized;
-    const yearPct      = yearGiven>0 ? Math.round(yearUtilized/yearGiven*100) : 0;
-    grandTotal += yearGiven; grandUtilized += yearUtilized;
-    const col = yearPct>=90?'#B91C1C':yearPct>=70?'#D97706':'#166534';
-    html+=`<tr>
-      <td><strong>${yr}</strong></td>
-      <td style="font-family:'DM Mono',monospace">${fmt(yearGiven)}</td>
-      <td style="font-family:'DM Mono',monospace">${fmt(yearUtilized)}</td>
-      <td style="font-family:'DM Mono',monospace;color:${yearRem<0?'#B91C1C':'inherit'}">${fmt(yearRem)}</td>
-      <td><span style="font-weight:700;color:${col}">${yearPct}%</span>
-        <div class="prog-wrap slim" style="margin-top:3px"><div class="prog-bar slim" style="width:${yearPct}%"></div></div>
-      </td>
-    </tr>`;
-  });
-
-  // Grand total row
-  const grandRem = grandTotal - grandUtilized;
-  const grandPct = grandTotal>0 ? Math.round(grandUtilized/grandTotal*100) : 0;
-  html+=`<tr style="background:#EFF3FA;font-weight:700">
-    <td><strong>TOTAL</strong></td>
-    <td style="font-family:'DM Mono',monospace"><strong>${fmt(grandTotal)}</strong></td>
-    <td style="font-family:'DM Mono',monospace"><strong>${fmt(grandUtilized)}</strong></td>
-    <td style="font-family:'DM Mono',monospace;color:${grandRem<0?'#B91C1C':'inherit'}"><strong>${fmt(grandRem)}</strong></td>
-    <td><strong style="color:#0B3D91">${grandPct}%</strong></td>
-  </tr>`;
-  html+=`</table></div>`;
+  html+='</div>';
 
   return html;
 }
@@ -2158,11 +2358,30 @@ function coeTab(t,id,el){
 function coeDash(id){
   const coe = COE_LIST.find(c=>c.id===id);
   const d   = getDB(id);
-  const piA  = d.preInc.reduce((s,e)=>s+(e.moneyGiven||0),0);
-  const tdA  = d.techDev.reduce((s,e)=>s+(e.moneyGiven||0),0);
-  const fwA  = d.fellows.length * FW_FIXED;
+  const isEmptyFY = currentFY !== "2026-27";
+  const fyBudget = isEmptyFY ? 0 : coe.budget;
+  if(!d){
+
+  return `
+  <div class="section-card"
+  style="
+    padding:40px;
+    text-align:center;
+    font-size:18px;
+    font-weight:600;
+    color:#b91c1c;
+  ">
+    No financial transaction for FY ${currentFY}
+  </div>
+  `;
+}
+  const piA  = isEmptyFY ? 0 : d.preInc.reduce((s,e)=>s+(e.moneyGiven||0),0);
+  const tdA  = isEmptyFY ? 0 : d.techDev.reduce((s,e)=>s+(e.moneyGiven||0),0);
+  const fwA  = isEmptyFY ? 0 : d.fellows.length * FW_FIXED;
   const used = piA+tdA+fwA;
-  const pct  = Math.round(used/coe.budget*100);
+  const pct = fyBudget > 0
+? Math.round((used / fyBudget) * 100)
+: 0;
   const piMax = coe.piMax*PI_MAX_PER;
   const tdMax = coe.tdMax*TD_MAX_PER;
   const fwMax = coe.fwMax*FW_FIXED;
@@ -2183,28 +2402,45 @@ width:100px;
 background:#fff;
 ">
 
-<option value="2025-26">
+<option value="2025-26" ${currentFY==="2025-26"?"selected":""}>
 FY 2025-26
 </option>
 
-<option value="2026-27" selected>
+<option value="2026-27" ${currentFY==="2026-27"?"selected":""}>
 FY 2026-27
 </option>
 
-</select></div><div class="mc-val">${fmt(coe.budget)}</div><div class="mc-sub">sanctioned</div></div>
+</select>
+
+    </div><div class="mc-val">${fmt(fyBudget)}</div><div class="mc-sub">sanctioned</div></div>
     <div class="mc"><div class="mc-label">Utilised</div><div class="mc-val">${fmt(used)}</div><div class="mc-sub">${pct}% of budget</div></div>
-    <div class="mc"><div class="mc-label">Pre-Incubation</div><div class="mc-val">${fmt(piA)}</div><div class="mc-sub">${d.preInc.length}/${coe.piMax} startups</div></div>
-    <div class="mc"><div class="mc-label">Technology Development</div><div class="mc-val">${fmt(tdA)}</div><div class="mc-sub">${d.techDev.length}/${coe.tdMax} projects</div></div>
-    <div class="mc"><div class="mc-label">Fellowships</div><div class="mc-val">${fmt(fwA)}</div><div class="mc-sub">${d.fellows.length}/${coe.fwMax} students</div></div>
+    <div class="mc"><div class="mc-label">Pre-Incubation</div><div class="mc-val">${fmt(piA)}</div><div class="mc-sub">${isEmptyFY ? 0 : d.preInc.length}/${coe.piMax} startups</div></div>
+    <div class="mc"><div class="mc-label">Technology Development</div><div class="mc-val">${fmt(tdA)}</div><div class="mc-sub">${isEmptyFY ? 0 : d.techDev.length} projects</div></div>
+    <div class="mc"><div class="mc-label">Fellowships</div><div class="mc-val">${fmt(fwA)}</div><div class="mc-sub">${isEmptyFY ? 0 : d.fellows.length} students</div></div>
   </div>
   <div class="sec-head"><span class="sec-head-title">Utilisation Breakdown</span></div>
   <div class="section-card">
-    ${pRow('Overall budget',used,coe.budget,true)}
-    ${pRow('Pre-Inc startups',d.preInc.length,coe.piMax,false)}
+    ${pRow('Overall budget',used,fyBudget,true)}
+    ${pRow(
+'Pre-Inc startups',
+isEmptyFY ? 0 : d.preInc.length,
+isEmptyFY ? 0 : coe.piMax,
+false
+)}
     ${pRow('Pre-Inc budget',piA,piMax,true)}
-    ${pRow('Technology Development projects',d.techDev.length,coe.tdMax,false)}
+    ${pRow(
+'Technology Development projects',
+isEmptyFY ? 0 : d.techDev.length,
+isEmptyFY ? 0 : coe.tdMax,
+false
+)}
     ${pRow('Technology Development budget',tdA,tdMax,true)}
-    ${pRow('Fellowship students',d.fellows.length,coe.fwMax,false)}
+    ${pRow(
+'Fellowship students',
+isEmptyFY ? 0 : d.fellows.length,
+isEmptyFY ? 0 : coe.fwMax,
+false
+)}
     ${pRow('Fellowship budget',fwA,fwMax,true)}
   </div>`;
   if(d.updates && d.updates.length){
