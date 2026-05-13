@@ -311,18 +311,23 @@ label {
 
 .topbar-left { display: flex; align-items: center; gap: 10px; }
 
-.tb-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
-  background: var(--secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+.tb-icon{
+    width:42px;
+    height:42px;
+    background:#ffffff;
+    border-radius:10px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    margin-right:12px;
 }
 
-.tb-icon svg { width: 17px; height: 17px; fill: #FFFFFF; }
+.tb-icon img{
+    width:30px;
+    height:30px;
+    object-fit:contain;
+}
 
 .tb-title {
   font-family: var(--font-heading);
@@ -330,15 +335,6 @@ label {
   font-weight: 700;
   color: #FFFFFF;
   letter-spacing: 0.3px;
-}
-
-.tb-badge {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 3px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
 }
 
 .badge-admin {
@@ -1148,7 +1144,9 @@ Loading...
 <div id="app" style="display:none;">
   <div class="topbar">
     <div class="topbar-left">
-      <div class="tb-icon"><svg viewBox="0 0 20 20"><path d="M10 2L3 7v11h5v-5h4v5h5V7L10 2z"/></svg></div>
+      <div class="tb-icon">
+    <img src="./favicon-64.png" alt="TEXMiN Logo">
+      </div>
       <div>
         <div class="tb-title" id="tb-title">Portal</div>
       </div>
@@ -1172,15 +1170,32 @@ Loading...
 //AUTH DATA
 
 const COE_LIST = [
-  {id:'nitnag',  name:'TEXMiN-NIT Nagaland Mining CoE',         tdMax:1, fwMax:5,  piMax:3, budget:3000000},
-  {id:'nitmiz',  name:'TEXMiN-NIT Mizoram Mining CoE',          tdMax:1, fwMax:5,  piMax:3, budget:3000000},
-  {id:'nitagt',  name:'TEXMiN-NIT Agartala Mining CoE',         tdMax:1, fwMax:5,  piMax:3, budget:3000000},
-  {id:'iiitman', name:'TEXMiN-IIIT Manipur Mining CoE',         tdMax:1, fwMax:5,  piMax:3, budget:3000000},
-  {id:'vnitnag', name:'TEXMiN-VNIT Nagpur Mining CoE',          tdMax:2, fwMax:10, piMax:5, budget:5800000, cicFund:600000},
-  {id:'iiest',   name:'TEXMiN-IIEST Shibpur Mining CoE',        tdMax:2, fwMax:10, piMax:5, budget:5800000, cicFund:600000},
-  {id:'nitrkl',  name:'TEXMiN-NITRkl-FTBI Mining CoE',          tdMax:2, fwMax:10, piMax:5, budget:5800000, cicFund:600000},
-  {id:'bitsin',  name:'TEXMiN-BIT Sindri Mining CoE',           tdMax:2, fwMax:10, piMax:5, budget:5800000, cicFund:600000},
-  {id:'mahuni',  name:'TEXMiN-Mahendra University Mining CoE',  tdMax:2, fwMax:5,  piMax:3, budget:6600000},
+  {id:'nitnag', name:'TEXMiN-NIT Nagaland Mining CoE', region:'North East Region',
+ tdMax:1, fwMax:5, piMax:3, budget:3000000},
+
+{id:'nitmiz', name:'TEXMiN-NIT Mizoram Mining CoE', region:'North East Region',
+ tdMax:1, fwMax:5, piMax:3, budget:3000000},
+
+{id:'nitagt', name:'TEXMiN-NIT Agartala Mining CoE', region:'North East Region',
+ tdMax:1, fwMax:5, piMax:3, budget:3000000},
+
+{id:'iiitman', name:'TEXMiN-IIIT Manipur Mining CoE', region:'North East Region',
+ tdMax:1, fwMax:5, piMax:3, budget:3000000},
+
+{id:'vnitnag', name:'TEXMiN-VNIT Nagpur Mining CoE', region:'West Region',
+ tdMax:2, fwMax:10, piMax:5, budget:5800000, cicFund:600000},
+
+{id:'iiest', name:'TEXMiN-IIEST Shibpur Mining CoE', region:'East Region',
+ tdMax:2, fwMax:10, piMax:5, budget:5800000, cicFund:600000},
+
+{id:'nitrkl', name:'TEXMiN-NITRKL-TBI Mining CoE', region:'East Region',
+ tdMax:2, fwMax:10, piMax:5, budget:5800000, cicFund:600000},
+
+{id:'bitsin', name:'TEXMiN-BIT Sindri Mining CoE', region:'East Region',
+ tdMax:2, fwMax:10, piMax:5, budget:5800000, cicFund:600000},
+
+{id:'mahuni', name:'TEXMiN-Mahendra University Mining CoE', region:'South Region',
+ tdMax:2, fwMax:5, piMax:3, budget:6600000},
 ];
 
 const TD_MAX_PER = 1500000;
@@ -1504,14 +1519,9 @@ async function handleUserSession(user){
 
       currentCoeId = data.coeId;
 
-      document.getElementById('tb-title').textContent =
-        coe.name;
+      document.getElementById('tb-title').textContent = `${coe.name} • ${coe.region}`;
 
-      badge.className='tb-badge badge-coe';
-      badge.textContent='CoE • Tier ' + coe.tier;
-
-      document.getElementById('tb-user').textContent =
-        data.name || user.email;
+      document.getElementById('tb-user').textContent = data.name || user.email;
 
       await loadFirestoreDB(data.coeId);
 
