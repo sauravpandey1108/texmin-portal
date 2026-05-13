@@ -1638,6 +1638,12 @@ function saveFYBudget(){
 
   renderAdmin();
 }
+function editFYBudget(){
+
+  FY_BUDGETS[currentFY] = 0;
+
+  renderAdmin();
+}
 function submitForgot(){
 
   const id = document.getElementById('fp-id').value.trim();
@@ -1792,70 +1798,160 @@ function adminOverview(){
         Total Sanctioned Budget
       </div>
 
-      <div style="margin-top:6px">
+      ${totBudget > 0 ? `
 
-  <input
-  type="number"
-  id="fy-budget-input"
-  placeholder="Enter FY Budget"
-  value="${totBudget}"
+<div style="
+  margin-top:10px;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:8px;
+">
+
+  <div style="
+    font-size:36px;
+    font-weight:700;
+    color:#0f766e;
+    line-height:1;
+  ">
+    ₹ ${(totBudget/10000000).toFixed(2)}Cr
+  </div>
+
+  <div style="
+    display:flex;
+    gap:8px;
+    align-items:center;
+  ">
+
+    <select
+  id="fy-select"
+  onchange="changeFY(this.value)"
   style="
-    width:140px;
-    padding:5px 8px;
+    padding:4px 8px;
     border:1px solid #d1d5db;
     border-radius:6px;
     font-size:11px;
-    margin-top:4px;
-  ">
-
-  <button
-  onclick="saveFYBudget()"
-  style="
-    margin-left:4px;
-    padding:5px 10px;
-    border:none;
-    border-radius:6px;
-    background:#0B3D91;
-    color:white;
-    font-size:11px;
+    font-weight:600;
     cursor:pointer;
-  ">
-    Save
-  </button>
+  "
+>
+
+<option
+  value="2025-26"
+  ${currentFY === "2025-26" ? "selected" : ""}
+>
+  FY 2025-26
+</option>
+
+<option
+  value="2026-27"
+  ${currentFY === "2026-27" ? "selected" : ""}
+>
+  FY 2026-27
+</option>
+
+</select>
+
+    <button
+      onclick="editFYBudget()"
+      style="
+        padding:4px 10px;
+        border:none;
+        border-radius:6px;
+        cursor:pointer;
+        background:#0f766e;
+        color:white;
+        font-size:11px;
+        font-weight:600;
+      ">
+      Edit
+    </button>
+
+  </div>
 
 </div>
 
-      <select id="fy-select"
-      onchange="changeFY(this.value)"
-      style="
-      margin-top:2px;
-      padding:2px 6px;
-      border-radius:5px;
-      border:1px solid #d1d5db;
-      font-size:10px;
-      font-weight:600;
-      cursor:pointer;
-      width:100px;
-      background:#fff;
-      ">
+` : `
 
-      <option value="2025-26" ${currentFY==="2025-26"?"selected":""}>
-      FY 2025-26
-      </option>
+<div style="
+  margin-top:10px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+">
 
-      <option value="2026-27" ${currentFY==="2026-27"?"selected":""}>
-      FY 2026-27
-      </option>
+<select
+  id="fy-select"
+  onchange="changeFY(this.value)"
+  style="
+    width:120px;
+    padding:4px 8px;
+    border:1px solid #d1d5db;
+    border-radius:6px;
+    font-size:11px;
+    font-weight:600;
+    cursor:pointer;
+  "
+>
 
-      </select>
+<option
+  value="2025-26"
+  ${currentFY === "2025-26" ? "selected" : ""}
+>
+  FY 2025-26
+</option>
 
-      <div class="mc-val">
-        ${fmt(totBudget)}
-      </div>
+<option
+  value="2026-27"
+  ${currentFY === "2026-27" ? "selected" : ""}
+>
+  FY 2026-27
+</option>
 
-      <div class="mc-sub">
-        across 9 CoEs
-      </div>
+</select>
+
+<div style="
+  display:flex;
+  gap:8px;
+  align-items:center;
+">
+
+<input
+type="number"
+id="fy-budget-input"
+placeholder="Enter FY Budget"
+style="
+  width:140px;
+  padding:6px 8px;
+  border:1px solid #d1d5db;
+  border-radius:6px;
+  font-size:11px;
+">
+
+<button
+onclick="saveFYBudget()"
+style="
+  padding:6px 12px;
+  border:none;
+  border-radius:6px;
+  background:#0f766e;
+  color:white;
+  cursor:pointer;
+  font-size:11px;
+  font-weight:600;
+">
+Save
+</button>
+
+</div>
+
+</div>
+
+`}
+
+
+
+  
 
     </div>
 
